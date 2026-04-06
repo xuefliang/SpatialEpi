@@ -1,0 +1,94 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "README_figure/README-"
+)
+```
+
+# SpatialEpi
+
+[![R-CMD-check](https://github.com/rudeboybert/SpatialEpi/workflows/R-CMD-check/badge.svg)](https://github.com/rudeboybert/SpatialEpi/actions)
+[![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/SpatialEpi)](https://cran.r-project.org/package=SpatialEpi) [![CRAN RStudio mirror downloads](https://cranlogs.r-pkg.org/badges/SpatialEpi)](https://www.r-pkg.org/pkg/SpatialEpi)
+
+Package of data and methods for spatial epidemiology. 
+
+## Installation
+
+Get the released version from CRAN:
+
+```{r, eval=FALSE}
+install.packages("SpatialEpi")
+```
+
+Or the development version from GitHub:
+
+```{r, eval=FALSE}
+# If you haven't installed devtools yet, do so:
+# install.packages("devtools")
+devtools::install_github("rudeboybert/SpatialEpi")
+```
+
+Note: In order for all C++ code to compile correctly you may need to
+
+1. Install the `cpp11` package
+1. Install an older version of `RcppArmadillo` by running  
+    ```{r, eval=FALSE}
+    packageurl <- "https://cran.r-project.org/src/contrib/Archive/RcppArmadillo/RcppArmadillo_0.9.900.3.0.tar.gz"
+install.packages(packageurl, repos=NULL, type="source")
+    ```
+
+
+
+## Example
+
+We load the data and convert the coordinate system from latitude/longitude to a grid-based system.
+
+```{r, message=FALSE, warning=FALSE}
+library(SpatialEpi)
+```
+
+```{r, message=FALSE, warning=FALSE}
+data(NYleukemia)
+sp.obj <- NYleukemia$spatial.polygon
+centroids <- latlong2grid(NYleukemia$geo[, 2:3])
+population <- NYleukemia$data$population
+cases <- NYleukemia$data$cases
+```
+
+We plot the incidence of leukemia for each census tract.
+
+```{r, message=FALSE, warning=FALSE, fig.height=6.5}
+plotmap(cases/population, sp.obj, log=TRUE, nclr=5)
+points(grid2latlong(centroids), pch=4)
+```
+
+We run the Bayesian Cluster Detection method from [Wakefield and Kim (2013)](https://www.researchgate.net/publication/235896508_A_Bayesian_model_for_cluster_detection):
+
+```{r bayes_cluster, message=FALSE, warning=FALSE, cache=TRUE}
+y <- cases
+E <- expected(population, cases, 1)
+max.prop <- 0.15
+shape <- c(2976.3, 2.31)
+rate <- c(2977.3, 1.31)
+J <- 7
+pi0 <- 0.95
+n.sim.lambda <- 10^4
+n.sim.prior <- 10^5
+n.sim.post <- 10^5
+
+# Compute output
+output <- bayes_cluster(y, E, population, sp.obj, centroids, max.prop,
+                        shape, rate, J, pi0, n.sim.lambda, n.sim.prior,
+                        n.sim.post)
+```
+
+```{r, fig.height=6.5}
+plotmap(output$post.map$high.area, sp.obj)
+```
