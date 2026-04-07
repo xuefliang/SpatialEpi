@@ -5,8 +5,8 @@
 \title{Plot Levels of a Variable in a Colour-Coded Map}
 \usage{
 mapvariable(
+  data,
   y,
-  spatial.polygon,
   ncut = 1000,
   nlevels = 10,
   lower = NULL,
@@ -17,9 +17,10 @@ mapvariable(
 )
 }
 \arguments{
-\item{y}{variable to plot}
+\item{data}{an sf object containing the variable to plot}
 
-\item{spatial.polygon}{an sf object}
+\item{y}{column name (unquoted) or character string specifying the variable to plot.
+Must be a column in \code{data}.}
 
 \item{ncut}{number of cuts in colour levels to plot}
 
@@ -36,17 +37,24 @@ mapvariable(
 \item{ylab}{a title for the y axis}
 }
 \value{
-A map colour-coded to indicate the different levels of \code{y}
+A map colour-coded to indicate the different levels of \code{y}. Returns \code{data} invisibly
+for use in pipelines.
 }
 \description{
 Plot levels of a variable in a colour-coded map along with a legend.
 }
 \examples{
 data(scotland_sf)
-y <- scotland_sf$cases
-E <- scotland_sf$expected
-SMR <- y/E
-mapvariable(SMR, scotland_sf, main="Scotland", xlab="Eastings (km)", ylab="Northings (km)")
+
+# Using pipe syntax (recommended)
+scotland_sf |> mapvariable(cases)
+
+# With transformations
+scotland_sf$SMR <- scotland_sf$cases / scotland_sf$expected
+scotland_sf |> mapvariable(SMR, main="Scotland SMR")
+
+# Using character column name
+scotland_sf |> mapvariable("cases", main="Scotland", xlab="Eastings (km)", ylab="Northings (km)")
 }
 \references{
 Pebesma, E. (2018) Simple Features for R: Standardized Support for Spatial Vector Data. \emph{The R Journal}, \strong{10}, 439--446.

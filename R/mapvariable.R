@@ -6,8 +6,9 @@ globalVariables(c(
 #'
 #' @description Plot levels of a variable in a colour-coded map along with a legend.
 #'
-#' @param y variable to plot
-#' @param spatial.polygon an sf object
+#' @param data an sf object containing the variable to plot
+#' @param y column name (unquoted) or character string specifying the variable to plot.
+#'   Must be a column in \code{data}.
 #' @param ncut number of cuts in colour levels to plot
 #' @param nlevels number of levels to include in legend
 #' @param lower lower bound of levels
@@ -20,28 +21,63 @@ globalVariables(c(
 #'
 #' @author Jon Wakefield, Nicky Best, Sebastien Haneuse, and Albert Y. Kim
 #'
-#' @return A map colour-coded to indicate the different levels of `y`
+#' @return A map colour-coded to indicate the different levels of `y`. Returns `data` invisibly
+#'   for use in pipelines.
 #'
 #' @export
 #'
 #' @examples
 #' data(scotland_sf)
-#' y <- scotland_sf$cases
-#' E <- scotland_sf$expected
-#' SMR <- y/E
-#' mapvariable(SMR, scotland_sf, main="Scotland", xlab="Eastings (km)", ylab="Northings (km)")
-mapvariable <- function(y, spatial.polygon, ncut=1000, nlevels=10, lower=NULL, upper=NULL,
+#'
+#' # Using pipe syntax (recommended)
+#' scotland_sf |> mapvariable(cases)
+#'
+#' # With transformations
+#' scotland_sf$SMR <- scotland_sf$cases / scotland_sf$expected
+#' scotland_sf |> mapvariable(SMR, main="Scotland SMR")
+#'
+#' # Using character column name
+#' scotland_sf |> mapvariable("cases", main="Scotland", xlab="Eastings (km)", ylab="Northings (km)")
+mapvariable <- function(data, y, ncut=1000, nlevels=10, lower=NULL, upper=NULL,
                         main=NULL, xlab=NULL, ylab=NULL) {
+
+  # Validate data is an sf object
+
+  if (!inherits(data, "sf")) {
+    stop("'data' must be an sf object")
+  }
+
+  # Handle y using non-standard evaluation
+
+  y_expr <- substitute(y)
+  if (is.character(y_expr)) {
+    # y is a character string
+    col_name <- y
+  } else if (is.name(y_expr)) {
+    # y is an unquoted column name
+    col_name <- as.character(y_expr)
+  } else {
+    stop("'y' must be a column name (unquoted) or a character string")
+  }
+
+  # Validate column exists in data
+  if (!col_name %in% names(data)) {
+    stop(paste0("Column '", col_name, "' not found in data. Available columns: ",
+                paste(setdiff(names(data), attr(data, "sf_column")), collapse = ", ")))
+  }
+
+  # Extract the variable
+  y_values <- data[[col_name]]
 
   #-------------------------------------------------------------------------------
   # Create id indicators for coloring scheme
   #-------------------------------------------------------------------------------
   if (is.null(lower))
-    lower <- min(y)
+    lower <- min(y_values)
   if (is.null(upper))
-    upper <- max(y)
+    upper <- max(y_values)
 
-  id <- cut(y, breaks=seq(from=lower, to=upper, length=(ncut+1)))
+  id <- cut(y_values, breaks=seq(from=lower, to=upper, length=(ncut+1)))
   id <- as.numeric(id)
   id[is.na(id)] <- 0
   id <- id + 1
@@ -53,7 +89,7 @@ mapvariable <- function(y, spatial.polygon, ncut=1000, nlevels=10, lower=NULL, u
   #-------------------------------------------------------------------------------
   # Make the scale of the two axes the same
   #-------------------------------------------------------------------------------
-  bbox <- sf::st_bbox(spatial.polygon)
+  bbox <- sf::st_bbox(data)
   xrnge <- c(bbox["xmin"], bbox["xmax"])
   yrnge <- c(bbox["ymin"], bbox["ymax"])
 
@@ -82,7 +118,7 @@ mapvariable <- function(y, spatial.polygon, ncut=1000, nlevels=10, lower=NULL, u
   layout(matrix(c(1,2), ncol=2, nrow=1), heights=c(.3, .3), widths=c(.4, .1))
 
   # plot variable
-  plot(sf::st_geometry(spatial.polygon), axes=TRUE, col=id)
+  plot(sf::st_geometry(data), axes=TRUE, col=id)
 
   # plot title and axis labels
   if (!is.null(main)) {
@@ -116,4 +152,7 @@ mapvariable <- function(y, spatial.polygon, ncut=1000, nlevels=10, lower=NULL, u
   # Reset colours to default
   palette("default")
   par(def.par)
+
+  # Return data invisibly for pipe chains
+  invisible(data)
 }
